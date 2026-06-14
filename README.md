@@ -1,6 +1,19 @@
-# Phishing-URL-Detection    
-With the rapid growth of internet usage, phishing attacks have become one of the most common and dangerous cybersecurity threats, targeting users to steal sensitive information such as login credentials, banking details, and personal data. This project presents a Phishing URL Detection System designed to automatically analyze and classify URLs as legitimate or malicious, thereby preventing potential security breaches. The system leverages machine learning techniques, including traditional algorithms like Random Forest and XGBoost, as well as deep learning models such as CNN, LSTM, and Transformer-based models, to detect phishing attempts accurately. It uses a combination of handcrafted URL features (like length, special characters, and shortening services) and tokenized URL patterns to improve detection performance. The system provides a confidence score indicating the likelihood of a URL being phishing, allowing users to make informed decisions. This project emphasizes real-time URL analysis, high detection accuracy, and practical usability, contributing to enhanced online security for individuals and organizations.
-# Feature Extraction
+Phishing URL Detection System
+
+Detects malicious URLs in real time using machine learning and a REST API.
+
+ How it works
+1. User sends a URL to the Flask `/predict` endpoint
+2. 11 features are extracted (length, dots, hyphens, IP check, keywords...)
+3. Random Forest model classifies it as Legitimate or Phishing
+4. API returns the result + confidence score
+
+Tech used
+Python · Scikit-learn · Flask · Pandas · joblib · REST API · Regex
+
+ Dataset
+web-page-phishing.csv — cleaned, label-encoded, duplicate-removed before training
+Feature Extraction
 import re
 from urllib.parse import urlparse
 

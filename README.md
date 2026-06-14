@@ -13,6 +13,17 @@ Python · Scikit-learn · Flask · Pandas · joblib · REST API · Regex
 
  Dataset
 web-page-phishing.csv — cleaned, label-encoded, duplicate-removed before training
+
+
+
+
+
+
+
+
+
+
+
 Feature Extraction
 import re
 from urllib.parse import urlparse

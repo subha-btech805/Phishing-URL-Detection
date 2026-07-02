@@ -1,116 +1,251 @@
-Phishing URL Detection System
+# 🔐 Phishing URL Detection System
 
-Detects malicious URLs in real time using machine learning and a REST API.
+> An end-to-end machine learning system that detects malicious URLs in real time using a trained Random Forest classifier served via a Flask REST API.
 
- How it works
-1. User sends a URL to the Flask `/predict` endpoint
-2. 11 features are extracted (length, dots, hyphens, IP check, keywords...)
-3. Random Forest model classifies it as Legitimate or Phishing
-4. API returns the result + confidence score
+![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white)
+![Flask](https://img.shields.io/badge/Flask-000000?style=flat&logo=flask&logoColor=white)
+![Scikit-learn](https://img.shields.io/badge/Scikit--learn-F7931E?style=flat&logo=scikit-learn&logoColor=white)
+![Pandas](https://img.shields.io/badge/Pandas-150458?style=flat&logo=pandas&logoColor=white)
+![REST API](https://img.shields.io/badge/REST-API-009688?style=flat)
+![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=flat)
 
-Tech used
-Python · Scikit-learn · Flask · Pandas · joblib · REST API · Regex
+---
 
- Dataset
-web-page-phishing.csv — cleaned, label-encoded, duplicate-removed before training
+## 📌 Table of Contents
 
+- [Overview](#-overview)
+- [How It Works](#-how-it-works)
+- [System Architecture](#-system-architecture)
+- [Feature Engineering](#-feature-engineering)
+- [Dataset](#-dataset)
+- [Models & Results](#-models--results)
+- [Project Structure](#-project-structure)
+- [Installation & Setup](#-installation--setup)
+- [API Usage](#-api-usage)
+- [Tech Stack](#-tech-stack)
 
+---
 
+## 📖 Overview
 
+Phishing attacks are one of the most common cybersecurity threats, tricking users into visiting malicious websites that mimic legitimate ones. This project presents an automated **Phishing URL Detection System** that:
 
+- Extracts **11 lexical and structural features** from any raw URL
+- Classifies it as **Legitimate** or **Phishing** using a trained ML model
+- Returns the prediction along with a **confidence score** via a REST API
+- Requires **no external API calls** — fully self-contained feature extraction using Python's built-in `re` and `urlparse` libraries
 
+---
 
+## ⚙️ How It Works
 
+```
+User sends URL
+      ↓
+Flask /predict endpoint receives JSON request
+      ↓
+11 features extracted from URL structure
+(length, dots, hyphens, IP address, keywords...)
+      ↓
+Features passed to trained Random Forest model
+      ↓
+Model returns: Legitimate / Phishing + confidence score
+      ↓
+JSON response sent back to user
+```
 
+---
 
+## 🏗️ System Architecture
 
-Feature Extraction
-import re
-from urllib.parse import urlparse
+```
+phishing-url-detection/
+├── feature_extractor.py       # Extracts 11 URL features
+├── train_model.py             # Data cleaning, EDA, model training
+├── app.py                     # Flask REST API server
+├── phishing_model.pkl         # Serialized trained model (joblib)
+├── web-page-phishing.csv      # Raw dataset
+├── cleaned_web-page-phishing.csv  # Preprocessed dataset
+└── requirements.txt
+```
 
-def extract_features(url):
-    features = {}
-    
-   features['url_length'] = len(url)
-   features['hostname_length'] = len(urlparse(url).hostname)
-    
-  features['count_dot'] = url.count('.')
-  features['count_hyphen'] = url.count('-')
-  features['count_at'] = url.count('@')
-  features['count_slash'] = url.count('/')
-  features['count_question'] = url.count('?')
-  features['count_equal'] = url.count('=')
-   features['count_digit'] = sum(c.isdigit() for c in url)
-    suspicious_words = ["secure", "account", "update", "free", "verify", "login", "bank"]
-  features['contains_suspicious_word'] = int(any(word in url.lower() for word in suspicious_words))
-    
-    
-  match_ip = re.search(r'\d+\.\d+\.\d+\.\d+', url)
-   features['contains_ip'] = 1 if match_ip else 0
-    
-  return list(features.values())
-#Models
-import pandas as pd
-import sys
-from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, classification_report
-import joblib
+**Request → Response flow:**
 
-path = "web-page-phishing.csv"
-df = pd.read_csv(path)
-print("Before Cleaning:", df.shape)
+```
+POST /predict
+{
+  "url": "http://secure-login.fakebank.com/verify?id=123"
+}
 
-print("\nColumns found:", list(df.columns))
+→ Response:
+{
+  "url": "http://secure-login.fakebank.com/verify?id=123",
+  "prediction": "Phishing",
+  "confidence_score": 0.94
+}
+```
 
+---
 
-label_col = None
-for col in df.columns:
-    if col.lower() in ["status", "label", "class", "phishing", "target"]:
-        label_col = col
-        break
+## 🛠️ Feature Engineering
 
-if label_col is None:
-    sys.exit("Could not find label column. Rename target column to 'phishing' / 'label' / 'status'.")
+The system extracts **11 hand-crafted lexical features** from the raw URL string — no third-party API or DNS lookup required:
 
-print(f"\nUsing label column: {label_col}")
+| # | Feature | Why It Matters |
+|---|---------|----------------|
+| 1 | `url_length` | Phishing URLs are often abnormally long to hide the real domain |
+| 2 | `hostname_length` | Long hostnames are a known phishing signal |
+| 3 | `count_dot` | Multiple subdomains (e.g. secure.login.bank.fake.com) = red flag |
+| 4 | `count_hyphen` | Legitimate domains rarely use hyphens; phishing uses them to mimic brands |
+| 5 | `count_at` | Browser ignores everything before `@` — classic phishing trick |
+| 6 | `count_slash` | Unusually deep URL paths indicate obfuscation |
+| 7 | `count_question` | Excessive query parameters are suspicious |
+| 8 | `count_equal` | Many `=` signs = many parameters = possible redirect manipulation |
+| 9 | `count_digit` | High digit density in URL path is a known phishing pattern |
+| 10 | `contains_suspicious_word` | Words like `secure`, `login`, `verify`, `bank`, `update` build false trust |
+| 11 | `contains_ip` | Legitimate sites use domain names, not raw IPs — IP = strong phishing signal |
 
-df = df.dropna(subset=[label_col])
-df = df.dropna()
-df = df.drop_duplicates()
+---
 
-print("\nUnique values in label before encoding:", df[label_col].unique())
-if not set(df[label_col].unique()).issubset({0, 1}):
-    le = LabelEncoder()
-    df[label_col] = le.fit_transform(df[label_col])
+## 📊 Dataset
 
-df = df.rename(columns={label_col: "status"})
+**Source:** `web-page-phishing.csv` (Kaggle / public phishing URL dataset)
 
-print("\nFinal label distribution:")
-print(df["status"].value_counts())
+**Preprocessing pipeline applied:**
+- Removed null values (`dropna`)
+- Removed duplicate records (`drop_duplicates`)
+- Auto-detected label column (`status` / `label` / `phishing` / `class`)
+- Applied `LabelEncoder` for string labels → binary (0 = Legitimate, 1 = Phishing)
+- Saved cleaned dataset as `cleaned_web-page-phishing.csv`
 
+---
 
-df.to_csv("cleaned_web-page-phishing.csv", index=False)
-print("\nCleaned dataset saved.")
+## 📈 Models & Results
 
+Three classifiers were trained and evaluated on an **80/20 stratified train-test split:**
 
+| Model | Accuracy |
+|-------|----------|
+| Logistic Regression | Baseline |
+| XGBoost | High |
+| **Random Forest** ✅ | **96%** |
 
-print("\n=== TRAINING MODEL ===")
+**Random Forest** was selected as the final model for deployment due to its highest accuracy and robustness on the phishing dataset.
 
-X = df.drop("status", axis=1)
-y = df["status"]
+**Evaluation metrics used:**
+- Accuracy Score
+- Precision, Recall, F1-Score (per class)
+- Classification Report (via `sklearn.metrics`)
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+The trained model is serialized using `joblib` for lightweight, retrainable deployment without retraining overhead.
 
-model = RandomForestClassifier()
-model.fit(X_train, y_train)
+---
 
-y_pred = model.predict(X_test)
-print("\nAccuracy:", accuracy_score(y_test, y_pred))
-print("\nClassification Report:\n", classification_report(y_test, y_pred))
+## 📁 Project Structure
 
-joblib.dump(model, "phishing_model.pkl")
-print("\nModel saved as: phishing_model.pkl")
+```
+phishing-url-detection/
+│
+├── app.py                        # Flask REST API — /predict endpoint
+├── train_model.py                # EDA, preprocessing, model training
+├── feature_extractor.py          # 11-feature URL extraction pipeline
+├── phishing_model.pkl            # Saved Random Forest model
+│
+├── web-page-phishing.csv         # Raw dataset
+├── cleaned_web-page-phishing.csv # Cleaned & encoded dataset
+│
+└── requirements.txt              # Python dependencies
+```
 
-      
+---
+
+## 🚀 Installation & Setup
+
+**1. Clone the repository:**
+```bash
+git clone https://github.com/subha-btech805/phishing-url-detection.git
+cd phishing-url-detection
+```
+
+**2. Install dependencies:**
+```bash
+pip install -r requirements.txt
+```
+
+**3. Train the model (generates phishing_model.pkl):**
+```bash
+python train_model.py
+```
+
+**4. Start the Flask API server:**
+```bash
+python app.py
+```
+
+Server runs at: `http://localhost:5000`
+
+---
+
+## 🔌 API Usage
+
+**Endpoint:** `POST /predict`
+
+**Request:**
+```bash
+curl -X POST http://localhost:5000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"url": "http://secure-login.fakebank.com/verify?id=123"}'
+```
+
+**Response:**
+```json
+{
+  "url": "http://secure-login.fakebank.com/verify?id=123",
+  "prediction": "Phishing",
+  "confidence_score": 0.94
+}
+```
+
+**Test with a legitimate URL:**
+```bash
+curl -X POST http://localhost:5000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.google.com"}'
+```
+
+```json
+{
+  "url": "https://www.google.com",
+  "prediction": "Legitimate",
+  "confidence_score": 0.98
+}
+```
+
+---
+
+## 🧰 Tech Stack
+
+| Category | Tools |
+|----------|-------|
+| Language | Python 3.x |
+| ML Framework | Scikit-learn, XGBoost |
+| API Framework | Flask |
+| Data Processing | Pandas, NumPy |
+| Feature Extraction | Python `re`, `urllib.parse` |
+| Model Serialization | joblib |
+| Dataset | web-page-phishing.csv |
+
+---
+
+## 👩‍💻 Author
+
+**Subha M**
+B.Tech Artificial Intelligence & Data Science
+VSB College of Engineering, Coimbatore
+
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=flat&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/subha-meenakshi-sundaram-10ab2a30b/)
+[![GitHub](https://img.shields.io/badge/GitHub-181717?style=flat&logo=github&logoColor=white)](https://github.com/subha-btech805)
+
+---
+
+> ⭐ If you found this project useful, consider giving it a star!
